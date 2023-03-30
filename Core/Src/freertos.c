@@ -137,9 +137,11 @@ void StartDefaultTask(void const * argument)
   for(;;)
   {
     osDelay(1);
-    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET); // Turn off orange LED
     GPIO_PinState UserPushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_2); // Read user input
-    if(UserPushButton == GPIO_PIN_SET){
+    if(UserPushButton == GPIO_PIN_SET){ // If button is reversed then update GPIO_InitStruct.Pull = GPIO_PULLUP; in gpio.c
+    	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET);
+    }
+    else{
     	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_SET);
     }
   }

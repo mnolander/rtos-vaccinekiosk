@@ -1,0 +1,4 @@
+freertos.c:71:6:vApplicationGetIdleTaskMemory	1
+freertos.c:85:6:MX_FREERTOS_Init	1
+freertos.c:133:6:StartDefaultTask	2
+freertos.c:158:6:StartInjectTask	1

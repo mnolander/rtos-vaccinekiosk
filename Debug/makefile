@@ -64,8 +64,8 @@ all: main-build
 main-build: VaccineKiosk.elf secondary-outputs
 
 # Tool invocations
-VaccineKiosk.elf VaccineKiosk.map: $(OBJS) $(USER_OBJS) C:\Users\Mikeb\OneDrive\ -\ Thompson\ Rivers\ University\CENG\ 3020\STMCube\VaccineKiosk\STM32F407VGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "VaccineKiosk.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\Mikeb\OneDrive - Thompson Rivers University\CENG 3020\STMCube\VaccineKiosk\STM32F407VGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="VaccineKiosk.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+VaccineKiosk.elf VaccineKiosk.map: $(OBJS) $(USER_OBJS) C:\Users\Mikeb\Documents\Coding\rtos-vaccinekiosk\STM32F407VGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "VaccineKiosk.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\Mikeb\Documents\Coding\rtos-vaccinekiosk\STM32F407VGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="VaccineKiosk.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
