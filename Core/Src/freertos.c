@@ -49,6 +49,9 @@
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
 osThreadId injectTaskHandle;
+osThreadId selectTaskHandle;
+osThreadId paymentTaskHandle;
+osThreadId armTaskHandle;
 osMessageQId vaccineQueueHandle;
 
 /* Private function prototypes -----------------------------------------------*/
@@ -58,6 +61,9 @@ osMessageQId vaccineQueueHandle;
 
 void StartDefaultTask(void const * argument);
 void StartInjectTask(void const * argument);
+void StartSelectTask(void const * argument);
+void StartPaymentTask(void const * argument);
+void StartArmTask(void const * argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -101,7 +107,7 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the queue(s) */
   /* definition and creation of vaccineQueue */
-  osMessageQDef(vaccineQueue, 10, uint16_t);
+  osMessageQDef(vaccineQueue, 1, uint16_t);
   vaccineQueueHandle = osMessageCreate(osMessageQ(vaccineQueue), NULL);
 
   /* USER CODE BEGIN RTOS_QUEUES */
@@ -110,12 +116,24 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the thread(s) */
   /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityIdle, 0, 128);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* definition and creation of injectTask */
   osThreadDef(injectTask, StartInjectTask, osPriorityHigh, 0, 128);
   injectTaskHandle = osThreadCreate(osThread(injectTask), NULL);
+
+  /* definition and creation of selectTask */
+  osThreadDef(selectTask, StartSelectTask, osPriorityBelowNormal, 0, 128);
+  selectTaskHandle = osThreadCreate(osThread(selectTask), NULL);
+
+  /* definition and creation of paymentTask */
+  osThreadDef(paymentTask, StartPaymentTask, osPriorityNormal, 0, 128);
+  paymentTaskHandle = osThreadCreate(osThread(paymentTask), NULL);
+
+  /* definition and creation of armTask */
+  osThreadDef(armTask, StartArmTask, osPriorityAboveNormal, 0, 128);
+  armTaskHandle = osThreadCreate(osThread(armTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -164,6 +182,101 @@ void StartInjectTask(void const * argument)
     osDelay(1);
   }
   /* USER CODE END StartInjectTask */
+}
+
+/* USER CODE BEGIN Header_StartSelectTask */
+/**
+* @brief Function implementing the selectTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartSelectTask */
+void StartSelectTask(void const * argument)
+{
+  /* USER CODE BEGIN StartSelectTask */
+  /* Infinite loop */
+	int selectedVaccine = 0;
+  for(;;)
+  {
+    osDelay(1);
+    GPIO_PinState SelectPushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_?); // Read user input (select button)
+    GPIO_PinState ChoosePushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_?); // Read user input (choose button)
+    if(SelectPushButton == GPIO_PIN_SET){
+    	if(HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_15) == GPIO_PIN_SET){ //If blue vaccine was last activated, switch to green
+    		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET);
+    		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
+    		selectedVaccine = 0;
+    	}
+    	else if(HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_12) == GPIO_PIN_SET){ //If green vaccine was last activated, switch to orange
+    		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
+    		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
+    		selectedVaccine = 1;
+    	}
+    	else if(HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_13) == GPIO_PIN_SET){ //If orange vaccine was last activated, switch to blue
+    		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
+    		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_SET);
+    		selectedVaccine = 2;
+    	}
+    }
+    if(ChoosePushButton == GPIO_PIN_SET){
+    	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
+    	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
+    	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
+    	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET);
+    	xQueueSendtoFront(vaccineQueueHandle, &selectedVaccine, 0); //Put selected vaccine into queue
+    }
+  }
+  /* USER CODE END StartSelectTask */
+}
+
+/* USER CODE BEGIN Header_StartPaymentTask */
+/**
+* @brief Function implementing the paymentTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartPaymentTask */
+void StartPaymentTask(void const * argument)
+{
+  /* USER CODE BEGIN StartPaymentTask */
+  /* Infinite loop */
+	uint16_t recValue;
+  for(;;)
+  {
+    osDelay(1);
+
+    GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+    vTaskDelay(500);
+    GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+    vTaskDelay(500);
+
+    GPIO_PinState PaymentPushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_?); // Read user input (payment button)
+
+    if(PaymentPushButton == GPIO_PIN_SET){
+    	//Queue again, move to arm state
+    }
+
+    xQueueReceive(vaccineQueueHandle, &recValue, pdMS_TO_TICKS(10000))
+  }
+  /* USER CODE END StartPaymentTask */
+}
+
+/* USER CODE BEGIN Header_StartArmTask */
+/**
+* @brief Function implementing the armTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartArmTask */
+void StartArmTask(void const * argument)
+{
+  /* USER CODE BEGIN StartArmTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartArmTask */
 }
 
 /* Private application code --------------------------------------------------*/
