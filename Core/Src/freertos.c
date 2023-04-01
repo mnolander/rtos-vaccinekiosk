@@ -173,7 +173,7 @@ void StartInjectTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	  vTaskSuspend(NULL);
   }
   /* USER CODE END StartInjectTask */
 }
@@ -194,6 +194,7 @@ void StartSelectTask(void const * argument)
   {
     GPIO_PinState SelectPushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_2); // Read user input (select button)
     GPIO_PinState ChoosePushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4); // Read user input (choose button)
+
     if(SelectPushButton == GPIO_PIN_RESET){ // If button is reversed then update GPIO_InitStruct.Pull = GPIO_PULLUP; in gpio.c
     	if(HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_15) == GPIO_PIN_SET){ //If blue vaccine was last activated, switch to green
     		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET);
@@ -218,6 +219,8 @@ void StartSelectTask(void const * argument)
     	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET);
     	xQueueSendToFront(vaccineQueueHandle, &selectedVaccine, 10000); //Put selected vaccine into queue
     	xTaskNotify(paymentTaskHandle, 0, eNoAction);
+    	vTaskSuspend(NULL);
+    	vTaskResume(paymentTaskHandle);
     }
   }
   /* USER CODE END StartSelectTask */
@@ -235,21 +238,22 @@ void StartPaymentTask(void const * argument)
   uint16_t recValue, paymentConfirm;
   for(;;)
   {
-    // Flash green LED
-	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
-    vTaskDelay(1000);
-    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
-    vTaskDelay(500);
-
-    // Wait for notification from StartArmTask before proceeding
-    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
+	// Wait for notification from StartArmTask before proceeding
+	ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+	xQueueReceive(vaccineQueueHandle, &recValue, pdMS_TO_TICKS(10000));
+	while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == GPIO_PIN_SET){
+		// Flash green LED
+		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+		vTaskDelay(500);
+	}
     // Check payment button
-    GPIO_PinState PaymentPushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5); // Read user input (payment button)
-    if(PaymentPushButton == GPIO_PIN_SET){
+    if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == GPIO_PIN_RESET){
+    	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
         // Put payment confirmation into queue
         xQueueSendToFront(vaccineQueueHandle, &paymentConfirm, 0);
+        xTaskNotify(armTaskHandle, 0, eNoAction);
+        vTaskSuspend(NULL);
+        vTaskResume(armTaskHandle);
     }
   }
 }
@@ -266,14 +270,73 @@ void StartArmTask(void const * argument)
   /* USER CODE BEGIN StartArmTask */
   /* Infinite loop */
 	uint16_t recValue;
+	uint32_t notificationValue = 0;
+	TickType_t buttonPressTime = 0;
+	TickType_t buttonHoldTime = pdMS_TO_TICKS(5000);
+	int armSuccess, armAttempt = 0;
   for(;;)
   {
-    osDelay(1);
+	ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    xQueueReceive(vaccineQueueHandle, &recValue, pdMS_TO_TICKS(10000));
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_SET);
+
     //ArmButton needs to be activated for 5 seconds, then go to injection task
     //If user activates button but deactivates within countdown, then enter fail-safe state
     //Red LED
 
-    xQueueReceive(vaccineQueueHandle, &recValue, pdMS_TO_TICKS(10000));
+	while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_SET){
+		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_14);
+		vTaskDelay(500);
+	}
+
+	while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_RESET){
+		  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_SET);
+		  armAttempt = 1;
+	      /* Record the time the user pressed the arm button */
+	      if (buttonPressTime == 0)
+	      {
+	        buttonPressTime = xTaskGetTickCount();
+	      }
+
+	      /* Check if the user has held the button for 5 seconds */
+	      if ((xTaskGetTickCount() - buttonPressTime) >= buttonHoldTime)
+	      {
+	        /* Success */
+	    	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
+	        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
+
+	        armSuccess = 1;
+	        /* Break out of the loop */
+	        break;
+	      }
+
+	      /* Check if the user has released the button */
+	      if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_SET)
+	      {
+	        /* Reset the button press time */
+	        buttonPressTime = 0;
+	      }
+	    }
+    /* Check if the loop was broken out of */
+	if(armAttempt == 1){
+    if (armSuccess == 1)
+    {
+      /* Wait for the injection task to complete */
+      ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+      /* Reset the notification value and button press time */
+      notificationValue = 0;
+      buttonPressTime = 0;
+
+      /* Turn off the red LED */
+      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
+    }
+    else if (armSuccess == 0)
+    {
+      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_SET);
+      /* Enter the fail-safe state */
+    }
+	}
   }
   /* USER CODE END StartArmTask */
 }

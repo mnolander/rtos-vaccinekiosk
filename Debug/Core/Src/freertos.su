@@ -3,5 +3,5 @@
 ../Core/Src/freertos.c:151:6:StartDefaultTask	16	static
 ../Core/Src/freertos.c:170:6:StartInjectTask	16	static
 ../Core/Src/freertos.c:188:6:StartSelectTask	24	static
-../Core/Src/freertos.c:235:6:StartPaymentTask	24	static
-../Core/Src/freertos.c:266:6:StartArmTask	24	static
+../Core/Src/freertos.c:236:6:StartPaymentTask	24	static
+../Core/Src/freertos.c:268:6:StartArmTask	40	static
