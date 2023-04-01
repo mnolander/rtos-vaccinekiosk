@@ -3,5 +3,5 @@ freertos.c:91:6:MX_FREERTOS_Init	1
 freertos.c:151:6:StartDefaultTask	1
 freertos.c:170:6:StartInjectTask	1
 freertos.c:188:6:StartSelectTask	6
-freertos.c:233:6:StartPaymentTask	1
-freertos.c:262:6:StartArmTask	1
+freertos.c:235:6:StartPaymentTask	2
+freertos.c:266:6:StartArmTask	1

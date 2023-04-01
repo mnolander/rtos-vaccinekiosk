@@ -213,11 +213,11 @@ void StartSelectTask(void const * argument)
     	vTaskDelay(250); //Delay so options don't switch too fast
     }
     if(ChoosePushButton == GPIO_PIN_RESET){
-    	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
     	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
     	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
     	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET);
     	xQueueSendToFront(vaccineQueueHandle, &selectedVaccine, 10000); //Put selected vaccine into queue
+    	xTaskNotify(paymentTaskHandle, 0, eNoAction);
     }
   }
   /* USER CODE END StartSelectTask */
@@ -232,24 +232,26 @@ void StartSelectTask(void const * argument)
 /* USER CODE END Header_StartPaymentTask */
 void StartPaymentTask(void const * argument)
 {
-  /* USER CODE BEGIN StartPaymentTask */
   uint16_t recValue, paymentConfirm;
   for(;;)
   {
-	xQueueReceive(vaccineQueueHandle, &recValue, 0);
-    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET); //Flash green LED
-    vTaskDelay(500);
+    // Flash green LED
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
+    vTaskDelay(1000);
     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
     vTaskDelay(500);
 
+    // Wait for notification from StartArmTask before proceeding
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+    // Check payment button
     GPIO_PinState PaymentPushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5); // Read user input (payment button)
-
-    //if(PaymentPushButton == GPIO_PIN_SET){
-    	//xQueueSendToFront(vaccineQueueHandle, &paymentConfirm, 0); //Put payment confirmation into queue
-    //}
-
+    if(PaymentPushButton == GPIO_PIN_SET){
+        // Put payment confirmation into queue
+        xQueueSendToFront(vaccineQueueHandle, &paymentConfirm, 0);
+    }
   }
-  /* USER CODE END StartPaymentTask */
 }
 
 /* USER CODE BEGIN Header_StartArmTask */
