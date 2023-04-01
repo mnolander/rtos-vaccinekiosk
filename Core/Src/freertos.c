@@ -116,23 +116,23 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the thread(s) */
   /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityIdle, 0, 128);
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityHigh, 0, 128);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* definition and creation of injectTask */
-  osThreadDef(injectTask, StartInjectTask, osPriorityHigh, 0, 128);
+  osThreadDef(injectTask, StartInjectTask, osPriorityBelowNormal, 0, 128);
   injectTaskHandle = osThreadCreate(osThread(injectTask), NULL);
 
   /* definition and creation of selectTask */
-  osThreadDef(selectTask, StartSelectTask, osPriorityNormal, 0, 128);
+  osThreadDef(selectTask, StartSelectTask, osPriorityHigh, 0, 128);
   selectTaskHandle = osThreadCreate(osThread(selectTask), NULL);
 
   /* definition and creation of paymentTask */
-  osThreadDef(paymentTask, StartPaymentTask, osPriorityBelowNormal, 0, 128);
+  osThreadDef(paymentTask, StartPaymentTask, osPriorityAboveNormal, 0, 128);
   paymentTaskHandle = osThreadCreate(osThread(paymentTask), NULL);
 
   /* definition and creation of armTask */
-  osThreadDef(armTask, StartArmTask, osPriorityAboveNormal, 0, 128);
+  osThreadDef(armTask, StartArmTask, osPriorityNormal, 0, 128);
   armTaskHandle = osThreadCreate(osThread(armTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -154,7 +154,8 @@ void StartDefaultTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_SET);
+    vTaskDelay(portMAX_DELAY);
   }
   /* USER CODE END StartDefaultTask */
 }
@@ -191,10 +192,9 @@ void StartSelectTask(void const * argument)
 	uint16_t selectedVaccine = 0;
   for(;;)
   {
-    osDelay(1);
-    GPIO_PinState SelectPushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_?); // Read user input (select button)
-    GPIO_PinState ChoosePushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_?); // Read user input (choose button)
-    if(SelectPushButton == GPIO_PIN_SET){ // If button is reversed then update GPIO_InitStruct.Pull = GPIO_PULLUP; in gpio.c
+    GPIO_PinState SelectPushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_2); // Read user input (select button)
+    GPIO_PinState ChoosePushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4); // Read user input (choose button)
+    if(SelectPushButton == GPIO_PIN_RESET){ // If button is reversed then update GPIO_InitStruct.Pull = GPIO_PULLUP; in gpio.c
     	if(HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_15) == GPIO_PIN_SET){ //If blue vaccine was last activated, switch to green
     		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET);
     		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
@@ -212,12 +212,12 @@ void StartSelectTask(void const * argument)
     	}
     	vTaskDelay(250); //Delay so options don't switch too fast
     }
-     if(ChoosePushButton == GPIO_PIN_SET){
+    if(ChoosePushButton == GPIO_PIN_RESET){
     	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
     	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
     	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
     	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET);
-    	xQueueSendtoFront(vaccineQueueHandle, &selectedVaccine, 0); //Put selected vaccine into queue
+    	xQueueSendToFront(vaccineQueueHandle, &selectedVaccine, 10000); //Put selected vaccine into queue
     }
   }
   /* USER CODE END StartSelectTask */
@@ -233,24 +233,21 @@ void StartSelectTask(void const * argument)
 void StartPaymentTask(void const * argument)
 {
   /* USER CODE BEGIN StartPaymentTask */
-  /* Infinite loop */
-	uint16_t recValue, paymentConfirm;
+  uint16_t recValue, paymentConfirm;
   for(;;)
   {
-    osDelay(1);
-
+	xQueueReceive(vaccineQueueHandle, &recValue, 0);
     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET); //Flash green LED
     vTaskDelay(500);
     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
     vTaskDelay(500);
 
-    GPIO_PinState PaymentPushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_?); // Read user input (payment button)
+    GPIO_PinState PaymentPushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5); // Read user input (payment button)
 
-    if(PaymentPushButton == GPIO_PIN_SET){
-    	xQueueSendtoFront(vaccineQueueHandle, &paymentConfirm, 0); //Put payment confirmation into queue
-    }
+    //if(PaymentPushButton == GPIO_PIN_SET){
+    	//xQueueSendToFront(vaccineQueueHandle, &paymentConfirm, 0); //Put payment confirmation into queue
+    //}
 
-    xQueueReceive(vaccineQueueHandle, &recValue, pdMS_TO_TICKS(10000));
   }
   /* USER CODE END StartPaymentTask */
 }
