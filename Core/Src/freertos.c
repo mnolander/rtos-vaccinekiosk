@@ -23,6 +23,10 @@
 #include "main.h"
 #include "cmsis_os.h"
 
+#define PWM_FREQUENCY 50 // 50 Hz
+#define PWM_MAX_DUTY_CYCLE 100 // 100% duty cycle
+#define PWM_MIN_DUTY_CYCLE 5 // 5% duty cycle
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -68,7 +72,6 @@ void StartArmTask(void const * argument);
 void StartFailSafe(void const * argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
-
 /* GetIdleTaskMemory prototype (linked to static allocation support) */
 void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize );
 
@@ -160,7 +163,12 @@ void StartDefaultTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
+  	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
+  	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_RESET);
     vTaskDelay(portMAX_DELAY);
   }
   /* USER CODE END StartDefaultTask */
@@ -178,6 +186,9 @@ void StartInjectTask(void const * argument)
   /* USER CODE BEGIN StartInjectTask */
   /* Infinite loop */
 	uint16_t recValue;
+	float servoPos = 0;
+	int servoDir = 1;
+	int injectConfirm = 0;
   for(;;)
   {
 	  ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
@@ -185,9 +196,36 @@ void StartInjectTask(void const * argument)
 
 	  while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_RESET){
 		  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, GPIO_PIN_SET);
+		  /*if(servoDir == 1){
+			  servoPos += 0.1;
+			  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, servoPos);
+			  if(servoPos >= 1){
+				  servoDir = 0; //Reverservo
+			  }
+		  }
+		  else if(servoDir == 0){
+			  servoPos -= 0.1;
+			  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, servoPos);
+			  if(servoPos <= 0){
+				  injectConfirm = 1;
+			  }
+		  }
+		  HAL_Delay(100); */
+		  injectConfirm = 1; //Temp
 	  }
-	  //Enter fail safe state
+
+	  if(injectConfirm == 1){
+		  //Hooray you got your vaccine without dying!
+		  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
+	      xTaskNotify(selectTaskHandle, 0, eNoAction);
+	      vTaskSuspend(NULL);
+	      vTaskResume(selectTaskHandle);
+	  }
+	  else{
+	      xTaskNotify(failsafeTaskHandle, 0, eNoAction);
+	      vTaskSuspend(NULL);
+	      vTaskResume(failsafeTaskHandle);
+	  }
   }
   /* USER CODE END StartInjectTask */
 }
@@ -206,10 +244,11 @@ void StartSelectTask(void const * argument)
 	uint16_t selectedVaccine = 0;
   for(;;)
   {
+	  ulTaskNotifyTake(pdTRUE, 0);
     GPIO_PinState SelectPushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_2); // Read user input (select button)
     GPIO_PinState ChoosePushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4); // Read user input (choose button)
 
-    if(SelectPushButton == GPIO_PIN_RESET || ChoosePushButton == GPIO_PIN_RESET){ // If button is reversed then update GPIO_InitStruct.Pull = GPIO_PULLUP; in gpio.c
+    if(SelectPushButton == GPIO_PIN_RESET){ // If button is reversed then update GPIO_InitStruct.Pull = GPIO_PULLUP; in gpio.c
     	if(selectedVaccine == 0){ //If blue vaccine was last activated, switch to green
     		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET);
     		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
@@ -331,8 +370,9 @@ void StartArmTask(void const * argument)
 		}
 		else if (armSuccess == 0)
 		{
-			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_SET);
-			/* Enter the fail-safe state */
+	        xTaskNotify(failsafeTaskHandle, 0, eNoAction);
+	        vTaskSuspend(NULL);
+	        vTaskResume(failsafeTaskHandle);
 		}
 	}
   }
@@ -350,9 +390,25 @@ void StartFailSafe(void const * argument)
 {
   /* USER CODE BEGIN StartFailSafe */
   /* Infinite loop */
+	TickType_t alertTime = pdMS_TO_TICKS(20000);
   for(;;)
   {
-    vTaskSuspend(NULL);
+	ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+	while(1){
+    if (xTaskGetTickCount() >= alertTime)
+    {
+        xTaskNotify(selectTaskHandle, 0, eNoAction);
+        vTaskSuspend(NULL);
+        vTaskResume(selectTaskHandle);
+    }
+	HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+	HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
+	HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_14);
+	HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_15);
+	HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_2);
+	HAL_Delay(700);
+	}
   }
   /* USER CODE END StartFailSafe */
 }
