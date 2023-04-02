@@ -163,13 +163,17 @@ void StartDefaultTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
+	ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
   	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
   	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_SET);
 	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_RESET);
-    vTaskDelay(portMAX_DELAY);
+
+    xTaskNotify(selectTaskHandle, 0, eNoAction);
+    vTaskResume(selectTaskHandle);
+    vTaskSuspend(NULL);
   }
   /* USER CODE END StartDefaultTask */
 }
@@ -185,47 +189,31 @@ void StartInjectTask(void const * argument)
 {
   /* USER CODE BEGIN StartInjectTask */
   /* Infinite loop */
-	uint16_t recValue;
-	float servoPos = 0;
-	int servoDir = 1;
-	int injectConfirm = 0;
+  uint16_t recValue;
+  int injectConfirm = 1;
   for(;;)
   {
-	  ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-	  xQueueReceive(vaccineQueueHandle, &recValue, pdMS_TO_TICKS(10000));
+    xQueueReceive(vaccineQueueHandle, &recValue, pdMS_TO_TICKS(10000));
 
-	  while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_RESET){
-		  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
-		  /*if(servoDir == 1){
-			  servoPos += 0.1;
-			  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, servoPos);
-			  if(servoPos >= 1){
-				  servoDir = 0; //Reverservo
-			  }
-		  }
-		  else if(servoDir == 0){
-			  servoPos -= 0.1;
-			  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, servoPos);
-			  if(servoPos <= 0){
-				  injectConfirm = 1;
-			  }
-		  }
-		  HAL_Delay(100); */
-		  injectConfirm = 1; //Temp
-	  }
+    while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_RESET){
+      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, GPIO_PIN_SET);
+      HAL_Delay(100);
+      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, GPIO_PIN_RESET);
+    }
 
-	  if(injectConfirm == 1){
-		  //Hooray you got your vaccine without dying!
-		  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
-	      xTaskNotify(selectTaskHandle, 0, eNoAction);
-	      vTaskSuspend(NULL);
-	      vTaskResume(selectTaskHandle);
-	  }
-	  else{
-	      xTaskNotify(failsafeTaskHandle, 0, eNoAction);
-	      vTaskSuspend(NULL);
-	      vTaskResume(failsafeTaskHandle);
-	  }
+    if(injectConfirm == 1){
+      //Hooray you got your vaccine without dying!
+      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
+      xTaskNotify(defaultTaskHandle, 0, eNoAction);
+      vTaskSuspend(NULL);
+      vTaskResume(defaultTaskHandle);
+    }
+    else{
+      xTaskNotify(failsafeTaskHandle, 0, eNoAction);
+      vTaskSuspend(NULL);
+      vTaskResume(failsafeTaskHandle);
+    }
   }
   /* USER CODE END StartInjectTask */
 }
@@ -244,7 +232,7 @@ void StartSelectTask(void const * argument)
 	uint16_t selectedVaccine = 0;
   for(;;)
   {
-	  ulTaskNotifyTake(pdTRUE, 0);
+	ulTaskNotifyTake(pdTRUE, 0);
     GPIO_PinState SelectPushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_2); // Read user input (select button)
     GPIO_PinState ChoosePushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4); // Read user input (choose button)
 
@@ -394,6 +382,10 @@ void StartFailSafe(void const * argument)
   for(;;)
   {
 	ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET);
 
 	while(1){
     if (xTaskGetTickCount() >= alertTime)
