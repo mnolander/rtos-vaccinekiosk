@@ -1,8 +1,8 @@
 ../Core/Src/freertos.c:80:6:vApplicationGetIdleTaskMemory	24	static
 ../Core/Src/freertos.c:94:6:MX_FREERTOS_Init	216	static
 ../Core/Src/freertos.c:162:6:StartDefaultTask	16	static
-../Core/Src/freertos.c:190:6:StartInjectTask	24	static
-../Core/Src/freertos.c:231:6:StartSelectTask	24	static
-../Core/Src/freertos.c:281:6:StartPaymentTask	24	static
-../Core/Src/freertos.c:312:6:StartArmTask	40	static
-../Core/Src/freertos.c:380:6:StartFailSafe	24	static
+../Core/Src/freertos.c:190:6:StartInjectTask	32	static
+../Core/Src/freertos.c:236:6:StartSelectTask	24	static
+../Core/Src/freertos.c:292:6:StartPaymentTask	24	static
+../Core/Src/freertos.c:323:6:StartArmTask	40	static
+../Core/Src/freertos.c:391:6:StartFailSafe	24	static
