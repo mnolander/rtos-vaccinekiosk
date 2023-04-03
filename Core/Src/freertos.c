@@ -23,10 +23,6 @@
 #include "main.h"
 #include "cmsis_os.h"
 
-#define PWM_FREQUENCY 50 // 50 Hz
-#define PWM_MAX_DUTY_CYCLE 100 // 100% duty cycle
-#define PWM_MIN_DUTY_CYCLE 5 // 5% duty cycle
-
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -58,6 +54,7 @@ osThreadId paymentTaskHandle;
 osThreadId armTaskHandle;
 osThreadId failsafeTaskHandle;
 osMessageQId vaccineQueueHandle;
+osMessageQId taskQueueHandle;
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -72,6 +69,7 @@ void StartArmTask(void const * argument);
 void StartFailSafe(void const * argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
+
 /* GetIdleTaskMemory prototype (linked to static allocation support) */
 void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize );
 
@@ -114,6 +112,10 @@ void MX_FREERTOS_Init(void) {
   /* definition and creation of vaccineQueue */
   osMessageQDef(vaccineQueue, 1, uint16_t);
   vaccineQueueHandle = osMessageCreate(osMessageQ(vaccineQueue), NULL);
+
+  /* definition and creation of taskQueue */
+  osMessageQDef(taskQueue, 1, uint16_t);
+  taskQueueHandle = osMessageCreate(osMessageQ(taskQueue), NULL);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -191,9 +193,10 @@ void StartInjectTask(void const * argument)
   /* Infinite loop */
   uint16_t recValue;
   int injectConfirm = 1;
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
   for(;;)
   {
-    xQueueReceive(vaccineQueueHandle, &recValue, pdMS_TO_TICKS(10000));
+    xQueueReceive(taskQueueHandle, &recValue, pdMS_TO_TICKS(10000));
 
     while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_RESET){
       HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
@@ -277,11 +280,11 @@ void StartSelectTask(void const * argument)
 /* USER CODE END Header_StartPaymentTask */
 void StartPaymentTask(void const * argument)
 {
-  uint16_t recValue, paymentConfirm;
+  uint16_t selectedVaccine;
   for(;;)
   {
 	ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-	xQueueReceive(vaccineQueueHandle, &recValue, pdMS_TO_TICKS(10000));
+	xQueueReceive(vaccineQueueHandle, &selectedVaccine, pdMS_TO_TICKS(10000));
 	while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == GPIO_PIN_SET){
 		// Flash green LED
 		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
@@ -290,8 +293,8 @@ void StartPaymentTask(void const * argument)
     // Check payment button
     if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == GPIO_PIN_RESET){
     	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
-        // Put payment confirmation into queue
-        xQueueSendToFront(vaccineQueueHandle, &paymentConfirm, 0);
+        // Put selected vaccine into queue
+        xQueueSendToFront(vaccineQueueHandle, &selectedVaccine, 0);
         xTaskNotify(armTaskHandle, 0, eNoAction);
         vTaskSuspend(NULL);
         vTaskResume(armTaskHandle);
@@ -310,14 +313,14 @@ void StartArmTask(void const * argument)
 {
   /* USER CODE BEGIN StartArmTask */
   /* Infinite loop */
-	uint16_t recValue;
+	uint16_t selectedVaccine;
 	TickType_t buttonPressTime = 0;
 	TickType_t buttonHoldTime = pdMS_TO_TICKS(5000);
 	int armSuccess, armAttempt = 0;
   for(;;)
   {
 	ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-    xQueueReceive(vaccineQueueHandle, &recValue, pdMS_TO_TICKS(10000));
+    xQueueReceive(vaccineQueueHandle, &selectedVaccine, pdMS_TO_TICKS(10000));
 	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_SET);
 
 	while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_SET){ //Flash red LED while waiting for arm button
@@ -351,7 +354,7 @@ void StartArmTask(void const * argument)
 		if (armSuccess == 1)
 		{
 			buttonPressTime = 0;
-	        xQueueSendToFront(vaccineQueueHandle, &armSuccess, 0);
+	        xQueueSendToFront(taskQueueHandle, &armSuccess, 0);
 	        xTaskNotify(injectTaskHandle, 0, eNoAction);
 	        vTaskSuspend(NULL);
 	        vTaskResume(injectTaskHandle);
@@ -378,7 +381,7 @@ void StartFailSafe(void const * argument)
 {
   /* USER CODE BEGIN StartFailSafe */
   /* Infinite loop */
-	TickType_t alertTime = pdMS_TO_TICKS(20000);
+	TickType_t alertTime = pdMS_TO_TICKS(30000);
   for(;;)
   {
 	ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
