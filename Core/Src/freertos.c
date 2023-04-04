@@ -193,25 +193,36 @@ void StartInjectTask(void const * argument)
   /* Infinite loop */
   uint16_t recValue;
   int injectConfirm = 0;
-  float servoPos = 0;
+  TickType_t servoFirstTime = 0;
+  TickType_t servoMoveTime = pdMS_TO_TICKS(2000);
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
   for(;;)
   {
     xQueueReceive(taskQueueHandle, &recValue, portMAX_DELAY);
+    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
 
-    while((HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_RESET) && (servoPos < 1)){
-      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
-      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, GPIO_PIN_SET);
-      HAL_Delay(100);
-      servoPos+=0.1;
-      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, GPIO_PIN_RESET);
+    while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_RESET){
+	if (servoFirstTime == 0)
+	{
+		servoFirstTime = xTaskGetTickCount();
+	}
+
+    if ((xTaskGetTickCount() - servoFirstTime) >= servoMoveTime){
+    	injectConfirm = 1;
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
     }
-    injectConfirm = 1;
+    else{
+    	while((xTaskGetTickCount() - servoFirstTime) < servoMoveTime){
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, GPIO_PIN_SET);
+        HAL_Delay(20);
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, GPIO_PIN_RESET);
+    	}
+    }
+    }
 
     if(injectConfirm == 1){
       //Hooray you got your vaccine without dying!
-      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
       HAL_Delay(5000);
       xTaskNotify(defaultTaskHandle, 0, eNoAction);
       vTaskSuspend(NULL);
@@ -245,9 +256,12 @@ void StartSelectTask(void const * argument)
     GPIO_PinState ChoosePushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4); // Read user input (choose button)
 
     if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_RESET){
-        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, GPIO_PIN_SET);
-        HAL_Delay(5);
-        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, GPIO_PIN_RESET);
+    	while(1){
+    HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_14);
+    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, GPIO_PIN_SET);
+    HAL_Delay(20);
+    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, GPIO_PIN_RESET);
+    	}
     }
 
     if(SelectPushButton == GPIO_PIN_RESET){ // If button is reversed then update GPIO_InitStruct.Pull = GPIO_PULLUP; in gpio.c

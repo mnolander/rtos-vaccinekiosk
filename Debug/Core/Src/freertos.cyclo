@@ -1,8 +1,8 @@
 freertos.c:80:6:vApplicationGetIdleTaskMemory	1
 freertos.c:94:6:MX_FREERTOS_Init	1
 freertos.c:162:6:StartDefaultTask	1
-freertos.c:190:6:StartInjectTask	3
-freertos.c:231:6:StartSelectTask	6
-freertos.c:281:6:StartPaymentTask	3
-freertos.c:312:6:StartArmTask	9
-freertos.c:380:6:StartFailSafe	2
+freertos.c:190:6:StartInjectTask	6
+freertos.c:247:6:StartSelectTask	7
+freertos.c:306:6:StartPaymentTask	3
+freertos.c:337:6:StartArmTask	9
+freertos.c:405:6:StartFailSafe	2
