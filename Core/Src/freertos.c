@@ -297,11 +297,23 @@ void StartSelectTask(void const * argument)
 void StartPaymentTask(void const * argument)
 {
   uint16_t selectedVaccine;
+  TickType_t payFirstTime = 0;
+  TickType_t paymentTimeout = pdMS_TO_TICKS(40000); //User has 40 seconds to pay or else timeout and kiosk resets
   for(;;)
   {
 	ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 	xQueueReceive(vaccineQueueHandle, &selectedVaccine, portMAX_DELAY);
 	while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == GPIO_PIN_SET){
+		if (payFirstTime == 0)
+		{
+			payFirstTime = xTaskGetTickCount();
+		}
+
+	    if ((xTaskGetTickCount() - payFirstTime) >= paymentTimeout){
+	        xTaskNotify(defaultTaskHandle, 0, eNoAction);
+	        vTaskSuspend(NULL);
+	        vTaskResume(defaultTaskHandle);
+	    }
 		// Flash green LED
 		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
 		vTaskDelay(500);
