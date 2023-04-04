@@ -222,7 +222,7 @@ void StartInjectTask(void const * argument)
     }
 
     if(injectConfirm == 1){
-      //Hooray you got your vaccine without dying!
+      //Vaccine successfully administered
       HAL_Delay(5000);
       xTaskNotify(defaultTaskHandle, 0, eNoAction);
       vTaskSuspend(NULL);
