@@ -255,15 +255,6 @@ void StartSelectTask(void const * argument)
     GPIO_PinState SelectPushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_2); // Read user input (select button)
     GPIO_PinState ChoosePushButton = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4); // Read user input (choose button)
 
-    if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_RESET){
-    	while(1){
-    HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_14);
-    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, GPIO_PIN_SET);
-    HAL_Delay(20);
-    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, GPIO_PIN_RESET);
-    	}
-    }
-
     if(SelectPushButton == GPIO_PIN_RESET){ // If button is reversed then update GPIO_InitStruct.Pull = GPIO_PULLUP; in gpio.c
     	if(selectedVaccine == 0){ //If blue vaccine was last activated, switch to green
     		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET);
